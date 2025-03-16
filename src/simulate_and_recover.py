@@ -1,49 +1,48 @@
 # Acknowledging reference to and help from ChatGPT
 
-import sys
 import numpy as np
+import math
 
-def simulate_data(a, v, t, N):
-    # Simulate data based on the EZ diffusion model parameters
-    # Placeholder simulation: You would need to replace this with the actual EZ diffusion model
-    print(f"Simulating data with parameters: a={a}, v={v}, t={t}, N={N}")
-    response_times = np.random.normal(loc=t, scale=0.1, size=N)  # Simulating response times
-    accuracy = np.random.choice([0, 1], size=N)  # Simulating correct/incorrect responses
+def simulate_predicted_parameters(alpha, nu, tau):
+    """ Simulate predicted parameters R_pred, M_pred, and V_pred """
+    y = np.exp(-alpha * nu)
+    R_pred = 1 / (y + 1)
+    M_pred = tau + (alpha / (2 * nu)) * (1 - y / (y + 1))
+    V_pred = (alpha / (2 * nu**3)) * (1 - 2 * alpha * nu * y - (y**2) / ((y + 1)**2))
+    return R_pred, M_pred, V_pred
 
-    return response_times, accuracy
+def simulate_observed_statistics(R_pred, M_pred, V_pred, N):
+    """ Simulate observed statistics from the predicted parameters """
+    # Simulate observed correct responses (Binomial distribution)
+    R_obs = np.random.binomial(N, R_pred) / N
 
-def recover_parameters(response_times, accuracy):
-    # Recover parameters from the simulated data
-    # Placeholder recovery: You would need to replace this with actual parameter recovery logic
-    a_est = np.mean(response_times)  # Placeholder for boundary separation estimation
-    v_est = np.mean(accuracy)  # Placeholder for drift rate estimation
-    t_est = np.mean(response_times)  # Placeholder for nondecision time estimation
-    
-    return a_est, v_est, t_est
+    # Simulate observed mean RT (Normal distribution)
+    M_obs = np.random.normal(M_pred, np.sqrt(V_pred / N))
 
-def main():
-    # Check for proper command-line arguments
-    if len(sys.argv) != 5:
-        print("Usage: python3 simulate_and_recover.py <a> <v> <t> <N>")
-        sys.exit(1)
+    # Simulate observed RT variance (Gamma distribution)
+    V_obs = np.random.gamma(N - 1 / 2, 2 * V_pred / (N - 1))
 
-    # Read in the command-line arguments
-    a = float(sys.argv[1])  # Boundary separation
-    v = float(sys.argv[2])  # Drift rate
-    t = float(sys.argv[3])  # Nondecision time
-    N = int(sys.argv[4])    # Number of trials
+    return R_obs, M_obs, V_obs
 
-    print(f"Running simulation for N={N} trials")
+def estimate_parameters(R_obs, M_obs, V_obs):
+    """ Estimate parameters from the observed data using the inverse EZ equations """
+    L = np.log(R_obs / (1 - R_obs))
 
-    # Simulate data based on the given parameters
-    response_times, accuracy = simulate_data(a, v, t, N)
+    # Estimate drift rate (nu)
+    nu_est = np.sign(R_obs - 0.5) * 4 * np.sqrt(L * ((R_obs**2) * L - R_obs * L + R_obs - 0.5) / V_obs)
 
-    # Recover parameters from the simulated data
-    a_est, v_est, t_est = recover_parameters(response_times, accuracy)
+    # Estimate boundary separation (alpha)
+    alpha_est = L / nu_est
 
-    # Output the true and recovered parameters
-    print(f"True Parameters: a={a}, v={v}, t={t}")
-    print(f"Recovered Parameters: a={a_est}, v={v_est}, t={t_est}")
+    # Estimate non-decision time (tau)
+    tau_est = M_obs - (alpha_est / (2 * nu_est)) * (1 - np.exp(-nu_est * alpha_est) / (1 + np.exp(-nu_est * alpha_est)))
 
-if __name__ == "__main__":
-    main()
+    return nu_est, alpha_est, tau_est
+
+def compute_bias(true_params, estimated_params):
+    """ Compute the bias between true and estimated parameters """
+    return np.array(true_params) - np.array(estimated_params)
+
+def compute_squared_error(true_params, estimated_params):
+    """ Compute squared error between true and estimated parameters """
+    return np.sum((np.array(true_params) - np.array(estimated_params)) ** 2)

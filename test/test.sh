@@ -1,11 +1,13 @@
-# Acknowledging reference to and help from ChatGPT
-
 #!/bin/bash
 
-# Run a quick test to verify the simulate-and-recover function
+# Test if the main simulation script runs without errors
+echo "Testing simulation script..."
 bash src/main.sh
-#python3 /workspace/EZ-diffusion-model/src/simulate_and_recover.py 1.5 1.2 0.3 10 (to run the tests in terminal)
-#python3 /workspace/EZ-diffusion-model/src/simulate_and_recover.py 1.5 1.2 0.3 40
-#python3 /workspace/EZ-diffusion-model/src/simulate_and_recover.py 1.5 1.2 0.3 4000
 
-# Add further tests as needed (e.g., unit tests for the Python functions)
+# Test if the result files are generated
+if [ -f "results/simulation_results_N10.txt" ] && [ -f "results/simulation_results_N40.txt" ] && [ -f "results/simulation_results_N4000.txt" ]; then
+    echo "Simulation results files found!"
+else
+    echo "Error: Simulation result files not found."
+    exit 1
+fi
