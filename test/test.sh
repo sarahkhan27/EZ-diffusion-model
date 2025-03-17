@@ -1,3 +1,5 @@
+# Acknowledging reference to and help from ChatGPT
+
 #!/bin/bash
 
 # Test if the main simulation script runs without errors

@@ -1,3 +1,5 @@
+# Acknowledging reference to and help from ChatGPT
+
 #!/bin/bash
 
 # Create directories to store results
