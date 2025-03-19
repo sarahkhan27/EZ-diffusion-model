@@ -1,61 +1,57 @@
-# Acknowledging reference to and help from ChatGPT
-
 import sys
 import os
-
-# Add the 'src' directory to the Python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
 
 import unittest
-import numpy as np
 from simulate_and_recover import simulate_predicted_parameters, simulate_observed_statistics, estimate_parameters, compute_bias, compute_squared_error
 
 class TestEZDiffusionModel(unittest.TestCase):
 
     def test_simulate_predicted_parameters(self):
-        alpha, nu, tau = 1.0, 1.0, 0.3
-        R_pred, M_pred, V_pred = simulate_predicted_parameters(alpha, nu, tau)
-        
-        # Check if the values returned are floats (you can also add a more specific check here)
-        self.assertIsInstance(R_pred, float)
-        self.assertIsInstance(M_pred, float)
-        self.assertIsInstance(V_pred, float)
+        # Example test case
+        params = {'a': 1.5, 'v': 1.0, 't': 0.3}
+        nu = 1.0  # Drift rate
+        tau = 0.3  # Non-decision time
+        predicted = simulate_predicted_parameters(params, nu, tau)
+        self.assertEqual(len(predicted), 3)  # Should return 3 predicted values
 
     def test_simulate_observed_statistics(self):
-        R_pred, M_pred, V_pred = 0.7, 0.4, 0.5
-        N = 40
-        R_obs, M_obs, V_obs = simulate_observed_statistics(R_pred, M_pred, V_pred, N)
-        
-        # Check if the observed statistics are floats
-        self.assertIsInstance(R_obs, float)
-        self.assertIsInstance(M_obs, float)
-        self.assertIsInstance(V_obs, float)
+        # Example test case
+        params = {'a': 1.5, 'v': 1.0, 't': 0.3}
+        V_pred = 0.4  # Predicted variance
+        N = 100  # Number of trials
+        observed = simulate_observed_statistics(params, V_pred, N)
+        self.assertEqual(len(observed), 3)  # Should return 3 observed values
 
     def test_estimate_parameters(self):
-        R_obs, M_obs, V_obs = 0.7, 0.4, 0.5
-        nu_est, alpha_est, tau_est = estimate_parameters(R_obs, M_obs, V_obs)
-        
-        # Check if the estimated parameters are floats
-        self.assertIsInstance(nu_est, float)
-        self.assertIsInstance(alpha_est, float)
-        self.assertIsInstance(tau_est, float)
+        # Example test case
+        observed_stats = {'R': 0.75, 'M': 0.5, 'V': 0.4}
+        M_obs = 0.5  # Example observed mean RT
+        V_obs = 0.4  # Example observed variance
+        estimated = estimate_parameters(observed_stats, M_obs, V_obs)
+        self.assertTrue('v' in estimated)  # Should return estimated drift rate 'v'
+        self.assertTrue('a' in estimated)  # Should return estimated boundary separation 'a'
+        self.assertTrue('t' in estimated)  # Should return estimated non-decision time 't'
 
     def test_compute_bias(self):
-        true_params = [1.0, 1.0, 0.3]
-        estimated_params = [1.1, 1.1, 0.3]
+        # Example test case
+        true_params = {'a': 1.5, 'v': 1.0, 't': 0.3}
+        estimated_params = {'a': 1.4, 'v': 1.1, 't': 0.32}
         bias = compute_bias(true_params, estimated_params)
-        
-        # Check if bias is a numpy array and has 3 elements
-        self.assertIsInstance(bias, np.ndarray)
-        self.assertEqual(len(bias), 3)
+        self.assertEqual(len(bias), 3)  # Should return 3 bias values
+        self.assertAlmostEqual(bias['a'], 0.1, places=5)  # Example bias check for 'a'
+        self.assertAlmostEqual(bias['v'], -0.1, places=5)  # Example bias check for 'v'
+        self.assertAlmostEqual(bias['t'], -0.02, places=5)  # Example bias check for 't'
 
     def test_compute_squared_error(self):
-        true_params = [1.0, 1.0, 0.3]
-        estimated_params = [1.1, 1.1, 0.3]
+        # Example test case
+        true_params = {'a': 1.5, 'v': 1.0, 't': 0.3}
+        estimated_params = {'a': 1.4, 'v': 1.1, 't': 0.32}
         squared_error = compute_squared_error(true_params, estimated_params)
-        
-        # Check if squared_error is a float
-        self.assertIsInstance(squared_error, float)
+        self.assertEqual(len(squared_error), 3)  # Should return 3 squared error values
+        self.assertAlmostEqual(squared_error['a'], 0.01, places=5)  # Example squared error check for 'a'
+        self.assertAlmostEqual(squared_error['v'], 0.01, places=5)  # Example squared error check for 'v'
+        self.assertAlmostEqual(squared_error['t'], 0.0004, places=5)  # Example squared error check for 't'
 
 if __name__ == '__main__':
     unittest.main()
