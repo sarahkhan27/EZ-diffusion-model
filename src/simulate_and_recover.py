@@ -1,3 +1,5 @@
+# Acknowledging reference to and help from ChatGPT
+
 import numpy as np
 
 def simulate_predicted_parameters(params, nu, tau):
