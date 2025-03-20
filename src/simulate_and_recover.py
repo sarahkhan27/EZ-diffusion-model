@@ -1,4 +1,4 @@
-# Acknowledging referance to and help from some website tools for fixing codes/ errors
+# Acknowledging reference to and help from ChatGPT
 
 import numpy as np
 import random

@@ -1,4 +1,4 @@
-# Acknowledging referance to and help from some website tools for fixing codes/ errors
+# Acknowledging reference to and help from ChatGPT
 
 import sys
 import os
@@ -151,6 +151,74 @@ class TestEZDiffusion(unittest.TestCase):
                     self.assertTrue(np.isfinite(v_est) and np.isfinite(alpha_est) and np.isfinite(tau_est))
             except Exception as e:
                 self.fail(f"Failed with parameters v={v}, alpha={alpha}, tau={tau}: {e}")
+    def test_bias_decreases_with_increasing_N(self):
+        """Test that bias decreases as sample size N increases"""
+        # Set true parameters
+        v, alpha, tau = 1.0, 1.0, 0.3
+        
+        # Test with different sample sizes
+        N_values = [10, 100, 1000]
+        squared_errors = []
+        
+        np.random.seed(42)  # For reproducibility
+        
+        for N in N_values:
+            total_squared_error = 0
+            iterations = 50  # Reduced iterations for test speed
+            
+            for _ in range(iterations):
+                _, _, _, _, squared_error = simulate_and_recover(v, alpha, tau, N)
+                total_squared_error += squared_error
+            
+            avg_squared_error = total_squared_error / iterations
+            squared_errors.append(avg_squared_error)
+        
+        # Verify that squared error decreases as N increases
+        self.assertGreater(squared_errors[0], squared_errors[1])
+        self.assertGreater(squared_errors[1], squared_errors[2])
+
+    def test_simulate_observed_stats(self):
+        """Test the simulation of observed summary statistics"""
+        # Set predicted values
+        R_pred = 0.75
+        M_pred = 0.7
+        V_pred = 0.05
+        
+        # Test with different sample sizes
+        N_values = [10, 100, 1000]
+        
+        np.random.seed(42)  # For reproducibility
+        
+        for N in N_values:
+            # Run multiple simulations to check distributions
+            R_samples = []
+            M_samples = []
+            V_samples = []
+            
+            iterations = 100  # Number of simulations to check distribution
+            
+            for _ in range(iterations):
+                R_obs, M_obs, V_obs = simulate_observed_stats(R_pred, M_pred, V_pred, N)
+                R_samples.append(R_obs)
+                M_samples.append(M_obs)
+                V_samples.append(V_obs)
+            
+            # Check if mean of observed values is close to predicted values
+            self.assertAlmostEqual(np.mean(R_samples), R_pred, places=1)
+            self.assertAlmostEqual(np.mean(M_samples), M_pred, places=1)
+            self.assertAlmostEqual(np.mean(V_samples), V_pred, places=1)
+            
+            # Check if variance decreases with increasing N (Central Limit Theorem)
+            if N > 10:  # Skip the smallest N
+                # Variance of R_obs should be approximately R_pred * (1 - R_pred) / N
+                expected_var_R = R_pred * (1 - R_pred) / N
+                self.assertAlmostEqual(np.var(R_samples), expected_var_R, places=2, 
+                                    msg=f"R variance for N={N} doesn't match expected")
+                
+                # Variance of M_obs should be approximately V_pred / N
+                expected_var_M = V_pred / N
+                self.assertLess(abs(np.var(M_samples) - expected_var_M) / expected_var_M, 0.5, 
+                            msg=f"M variance for N={N} is too far from expected")
 
 if __name__ == '__main__':
     unittest.main()
