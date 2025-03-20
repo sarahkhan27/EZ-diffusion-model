@@ -6,130 +6,87 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../s
 
 import unittest
 import numpy as np
-from simulate_and_recover import generate_predicted_statistics, generate_observed_statistics, recover_parameters, calculate_bias_and_squared_error
+from simulate_and_recover import forward_ez, inverse_ez
 
-class TestSimulation(unittest.TestCase):
+class TestEZDiffusion(unittest.TestCase):
+    def test_forward_ez(self):
+        """Test forward EZ equations with some known values"""
+        v, alpha, tau = 1.0, 1.0, 0.3
+        R_pred, M_pred, V_pred = forward_ez(v, alpha, tau)
+        
+        # Check if the output is within reasonable bounds
+        self.assertTrue(0 < R_pred < 1)
+        self.assertTrue(tau < M_pred)
+        self.assertTrue(V_pred > 0)
+        
+        # Check if accuracy is 0.5 when drift rate is 0
+        R_pred_zero, _, _ = forward_ez(0.001, 1.0, 0.3)  # Using very small v instead of 0
+        self.assertAlmostEqual(R_pred_zero, 0.5, places=2)
     
-    def test_generate_predicted_statistics(self):
-        # Set the true parameters (alpha, v, tau)
-        true_params = (1.0, 1.0, 0.2)
-        alpha, v, tau = true_params
+    def test_inverse_ez(self):
+        """Test inverse EZ equations by checking if we can recover known parameters"""
+        # Start with some true parameters
+        v_true, alpha_true, tau_true = 1.0, 1.0, 0.3
         
-        # Generate predicted statistics
-        R_pred, M_pred, V_pred = generate_predicted_statistics(alpha, v, tau)
-
-        # Debugging: Print the results of the predicted statistics
-        print(f"Test: Generating Predicted Statistics")
-        print(f"alpha: {alpha}, v: {v}, tau: {tau}")
-        print(f"R_pred: {R_pred}, M_pred: {M_pred}, V_pred: {V_pred}")
-
-        # Assert that R_pred is close to 0.5
-        self.assertAlmostEqual(R_pred, 0.5, delta=0.1)
+        # Get predicted summary statistics
+        R_pred, M_pred, V_pred = forward_ez(v_true, alpha_true, tau_true)
+        
+        # Recover parameters
+        v_est, alpha_est, tau_est = inverse_ez(R_pred, M_pred, V_pred)
+        
+        # Check if recovered parameters are close to true parameters
+        self.assertAlmostEqual(v_est, v_true, places=4)
+        self.assertAlmostEqual(alpha_est, alpha_true, places=4)
+        self.assertAlmostEqual(tau_est, tau_true, places=4)
     
-    def test_generate_observed_statistics(self):
-        # Set the true parameters (alpha, v, tau)
-        true_params = (1.0, 1.0, 0.2)
-        alpha, v, tau = true_params
+    def test_parameter_recovery(self):
+        """Test parameter recovery with different parameter values"""
+        test_params = [
+            (0.5, 0.5, 0.1),
+            (1.0, 1.0, 0.2),
+            (1.5, 1.5, 0.3),
+            (2.0, 2.0, 0.4)
+        ]
         
-        # Generate predicted statistics
-        R_pred, M_pred, V_pred = generate_predicted_statistics(alpha, v, tau)
-        
-        # Set sample size
-        N = 10
-        
-        # Generate observed statistics
-        R_obs, M_obs, V_obs = generate_observed_statistics(R_pred, M_pred, V_pred, N)
+        for v_true, alpha_true, tau_true in test_params:
+            # Get predicted summary statistics
+            R_pred, M_pred, V_pred = forward_ez(v_true, alpha_true, tau_true)
+            
+            # Recover parameters
+            v_est, alpha_est, tau_est = inverse_ez(R_pred, M_pred, V_pred)
+            
+            # Check if recovered parameters are close to true parameters
+            self.assertAlmostEqual(v_est, v_true, places=4)
+            self.assertAlmostEqual(alpha_est, alpha_true, places=4)
+            self.assertAlmostEqual(tau_est, tau_true, places=4)
+    def test_edge_cases(self):
+        """Test edge cases for EZ diffusion model"""
+        # Test with very high drift rate (should result in near-perfect accuracy)
+        v_high, alpha, tau = 10.0, 1.0, 0.3
+        R_pred, M_pred, V_pred = forward_ez(v_high, alpha, tau)
+        self.assertGreater(R_pred, 0.99)  # Accuracy should be very high
 
-        # Debugging: Print the results of the observed statistics
-        print(f"Test: Generating Observed Statistics")
-        print(f"R_pred: {R_pred}, M_pred: {M_pred}, V_pred: {V_pred}, N: {N}")
-        print(f"R_obs: {R_obs}, M_obs: {M_obs}, V_obs: {V_obs}")
+        # Test with drift rate near zero (should result in accuracy near 0.5)
+        v_zero, alpha, tau = 0.001, 1.0, 0.3
+        R_pred, M_pred, V_pred = forward_ez(v_zero, alpha, tau)
+        self.assertAlmostEqual(R_pred, 0.5, places=2)  # Accuracy should be close to 0.5
 
-        # Assert that R_obs, M_obs, and V_obs are within reasonable bounds
-        self.assertTrue(0 <= R_obs <= 1)
-        self.assertTrue(M_obs >= 0)
-        self.assertTrue(V_obs >= 0)
+        # Test with very large boundary separation (should result in longer RT)
+        v, alpha_high, tau = 1.0, 5.0, 0.3
+        _, M_pred_high, _ = forward_ez(v, alpha_high, tau)
+        _, M_pred_normal, _ = forward_ez(v, 1.0, tau)
+        self.assertGreater(M_pred_high, M_pred_normal)  # RT should be longer with higher boundary
 
-    def test_recover_parameters(self):
-        # Set the true parameters (alpha, v, tau)
-        true_params = (1.0, 1.0, 0.2)
-        alpha, v, tau = true_params
-        
-        # Generate predicted statistics
-        R_pred, M_pred, V_pred = generate_predicted_statistics(alpha, v, tau)
-        
-        # Set sample size
-        N = 10
-        
-        # Generate observed statistics
-        R_obs, M_obs, V_obs = generate_observed_statistics(R_pred, M_pred, V_pred, N)
-        
-        # Recover parameters from observed data
-        v_est, alpha_est, tau_est = recover_parameters(R_obs, M_obs, V_obs)
-        
-        # Debugging: Print the recovered parameters and compare to true values
-        print(f"Test: Recovering Parameters")
-        print(f"True parameters: (alpha: {alpha}, v: {v}, tau: {tau})")
-        print(f"Recovered parameters: (v_est: {v_est}, alpha_est: {alpha_est}, tau_est: {tau_est})")
+        # Test with very small boundary separation (should result in shorter RT)
+        v, alpha_low, tau = 1.0, 0.1, 0.3
+        _, M_pred_low, _ = forward_ez(v, alpha_low, tau)
+        self.assertLess(M_pred_low, M_pred_normal)  # RT should be shorter with lower boundary
 
-        # Assert that recovered v_est is close to true v
-        self.assertAlmostEqual(v_est, v, delta=0.1)
-    
-    def test_calculate_bias_and_squared_error(self):
-        # Set the true parameters (alpha, v, tau)
-        true_params = (1.0, 1.0, 0.2)
-        alpha, v, tau = true_params
-        
-        # Generate predicted statistics
-        R_pred, M_pred, V_pred = generate_predicted_statistics(alpha, v, tau)
-        
-        # Set sample size
-        N = 10
-        
-        # Generate observed statistics
-        R_obs, M_obs, V_obs = generate_observed_statistics(R_pred, M_pred, V_pred, N)
-        
-        # Recover parameters from observed data
-        v_est, alpha_est, tau_est = recover_parameters(R_obs, M_obs, V_obs)
-        
-        # Calculate bias and squared error
-        bias, squared_error = calculate_bias_and_squared_error(true_params, (v_est, alpha_est, tau_est))
+        # Test preservation of non-decision time
+        v, alpha, tau_high = 1.0, 1.0, 0.5
+        _, M_pred_high_tau, _ = forward_ez(v, alpha, tau_high)
+        _, M_pred_normal_tau, _ = forward_ez(v, alpha, 0.3)
+        self.assertAlmostEqual(M_pred_high_tau - M_pred_normal_tau, 0.2, places=4)  # Difference in RT should equal difference in tau
 
-        # Debugging: Print the bias and squared error
-        print(f"Test: Calculating Bias and Squared Error")
-        print(f"True parameters: {true_params}")
-        print(f"Estimated parameters: {(v_est, alpha_est, tau_est)}")
-        print(f"Bias: {bias}, Squared Error: {squared_error}")
-
-        # Assert that the bias for each parameter is less than 0.1
-        self.assertLess(abs(bias[0]), 0.1)  # Check bias for v
-        self.assertLess(abs(bias[1]), 0.1)  # Check bias for alpha
-        self.assertLess(abs(bias[2]), 0.1)  # Check bias for tau
-
-        # Assert that squared error is less than a threshold
-        self.assertLess(squared_error, 1.0)
-
-    def test_large_sample_size(self):
-        # Set the true parameters (alpha, v, tau)
-        true_params = (1.0, 1.0, 0.2)
-        alpha, v, tau = true_params
-        
-        # Set large sample size
-        N = 4000
-        
-        # Simulate and recover parameters for large sample size
-        bias, squared_error = simulate_and_recover(true_params, N)
-        
-        # Debugging: Print bias and squared error for large sample size
-        print(f"Test: Large Sample Size (N={N})")
-        print(f"Bias (first few): {bias[:5]}")  # Print first 5 for example
-        print(f"Squared Error (first few): {squared_error[:5]}")
-
-        # Assert that v_est is close to true v
-        self.assertAlmostEqual(bias[0], 0, delta=0.1)  # Check bias for v
-        self.assertAlmostEqual(bias[1], 0, delta=0.1)  # Check bias for alpha
-        self.assertAlmostEqual(bias[2], 0, delta=0.1)  # Check bias for tau
-
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

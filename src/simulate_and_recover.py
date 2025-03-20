@@ -1,96 +1,120 @@
+import sys
+import os
+import unittest
 import numpy as np
+import random
+import scipy.stats as stats
 
-# Function to simulate predicted statistics (R_pred, M_pred, V_pred)
-def generate_predicted_statistics(alpha, v, tau):
+# Add this function and its dependencies to your script
+def forward_ez(v, alpha, tau):
+    """
+    Forward EZ diffusion model equations.
+    
+    Parameters:
+    v (float): Drift rate
+    alpha (float): Boundary separation
+    tau (float): Non-decision time
+    
+    Returns:
+    tuple: (R_pred, M_pred, V_pred) - predicted accuracy, mean RT, and variance of RT
+    """
+    # Substitute parameter names (v, alpha, tau) for (v, a, t) in the equations
     y = np.exp(-alpha * v)
-    R_pred = 1 / (y + 1)
-    M_pred = tau + (alpha / (2 * v)) * (1 - y / (1 + y))
-    V_pred = (alpha / (2 * v ** 3)) * (1 - 2 * alpha * v * y - (y ** 2) / (y + 1) ** 2)
+    
+    # Equation 1: Predicted accuracy
+    R_pred = 1 / (1 + y)
+    
+    # Equation 2: Predicted mean RT
+    M_pred = tau + (alpha / (2 * v)) * ((1 - y) / (1 + y))
+    
+    # Equation 3: Predicted variance of RT
+    V_pred = (alpha / (2 * v**3)) * ((1 - 2*alpha*v*y - y**2) / (1 + y)**2)
+    
     return R_pred, M_pred, V_pred
 
-# Function to simulate observed statistics (R_obs, M_obs, V_obs)
-def generate_observed_statistics(R_pred, M_pred, V_pred, N):
-    R_obs = np.random.binomial(N, R_pred) / N
-    M_obs = np.random.normal(M_pred, np.sqrt(V_pred / N))
-    V_obs = np.random.gamma(N - 1 / 2, 2 * V_pred / (N - 1))
-    return R_obs, M_obs, V_obs
-
-# Function to recover estimated parameters (v_est, alpha_est, tau_est)
-def recover_parameters(R_obs, M_obs, V_obs):
-    # Avoid division by zero by adding a small epsilon when R_obs is 1
-    epsilon = 1e-10
-    R_obs = np.clip(R_obs, epsilon, 1 - epsilon)  # Ensure R_obs is within (0, 1)
+def inverse_ez(R_obs, M_obs, V_obs):
+    """
+    Inverse EZ diffusion model equations.
     
-    L = np.log(R_obs / (1 - R_obs))  # Log of the odds ratio
-
-    # Safeguard against division by zero or very small v_est
-    v_est = np.sign(R_obs - 1 / 2) * 4 * np.sqrt(L * ((R_obs ** 2) * L - (R_obs) * L + R_obs - 1 / 2) / V_obs)
+    Parameters:
+    R_obs (float): Observed accuracy
+    M_obs (float): Observed mean RT
+    V_obs (float): Observed variance of RT
     
-    # Add a small epsilon to v_est if it is too close to zero to avoid division by zero
-    v_est = np.where(np.abs(v_est) < epsilon, epsilon, v_est)
-
+    Returns:
+    tuple: (v_est, alpha_est, tau_est) - estimated drift rate, boundary separation, and non-decision time
+    """
+    # Intermediate calculation L
+    L = np.log(R_obs / (1 - R_obs))
+    
+    # Equation 4: Estimated drift rate
+    v_est = np.sign(R_obs - 0.5) * (L * (R_obs**2 * L - R_obs * L + R_obs - 0.5) / V_obs)**(1/4)
+    
+    # Equation 5: Estimated boundary separation
     alpha_est = L / v_est
-
-    # Safeguard for tau_est if alpha_est or v_est is very small
-    tau_est = M_obs - (alpha_est / (2 * v_est)) * (1 - np.exp(-v_est * alpha_est) / (1 + np.exp(-v_est * alpha_est)))
-
+    
+    # Equation 6: Estimated non-decision time
+    y_est = np.exp(-v_est * alpha_est)
+    tau_est = M_obs - (alpha_est / (2 * v_est)) * ((1 - y_est) / (1 + y_est))
+    
     return v_est, alpha_est, tau_est
 
-# Function to calculate bias and squared error
-def calculate_bias_and_squared_error(true_params, estimated_params):
-    bias = np.array(true_params) - np.array(estimated_params)
-    squared_error = np.sum(bias ** 2)
-    return bias, squared_error
-
-# Simulate-and-recover process
-def simulate_and_recover(true_params, N, iterations=1000):
-    bias_all = np.zeros((iterations, 3))  # To store bias for each parameter
-    squared_error_all = np.zeros(iterations)  # To store squared error for each iteration
-
-    for i in range(iterations):
-        # Generate predicted statistics
-        R_pred, M_pred, V_pred = generate_predicted_statistics(*true_params)
-
-        # Generate observed statistics
-        R_obs, M_obs, V_obs = generate_observed_statistics(R_pred, M_pred, V_pred, N)
-
-        # Recover parameters from observed data
-        estimated_params = recover_parameters(R_obs, M_obs, V_obs)
-
-        # Calculate bias and squared error
-        bias, squared_error = calculate_bias_and_squared_error(true_params, estimated_params)
-
-        bias_all[i] = bias
-        squared_error_all[i] = squared_error
-
-    return bias_all, squared_error_all
-
-# Main function to run the simulation and recovery for all sample sizes
-def main():
-    # True parameters (within specified range)
-    true_params = [np.random.uniform(0.5, 2),  # alpha
-                   np.random.uniform(0.5, 2),  # v (drift rate)
-                   np.random.uniform(0.1, 0.5)]  # tau (non-decision time)
-
-    # Sample sizes to test
-    sample_sizes = [10, 40, 4000]
+def simulate_observed_stats(R_pred, M_pred, V_pred, N):
+    """
+    Simulate observed summary statistics from predicted ones.
     
-    # Results container
-    all_bias = {}
-    all_squared_error = {}
+    Parameters:
+    R_pred (float): Predicted accuracy rate
+    M_pred (float): Predicted mean RT
+    V_pred (float): Predicted variance of RT
+    N (int): Sample size
+    
+    Returns:
+    tuple: (R_obs, M_obs, V_obs) - observed accuracy, mean RT, and variance of RT
+    """
+    # Equation 7: Simulating observed number of correct trials
+    T_obs = stats.binom.rvs(n=N, p=R_pred)
+    R_obs = T_obs / N
+    
+    # Equation 8: Simulating observed mean RT
+    M_obs = stats.norm.rvs(loc=M_pred, scale=np.sqrt(V_pred / N))
+    
+    # Equation 9: Simulating observed variance of RT
+    V_obs = stats.gamma.rvs(a=(N-1)/2, scale=2*V_pred/(N-1))
+    
+    return R_obs, M_obs, V_obs
 
-    # Run simulations for each sample size
-    for N in sample_sizes:
-        bias, squared_error = simulate_and_recover(true_params, N)
-        all_bias[N] = bias
-        all_squared_error[N] = squared_error
-
-    # Output results for analysis
-    for N in sample_sizes:
-        print(f"Sample size: {N}")
-        print(f"Average bias: {np.mean(all_bias[N], axis=0)}")
-        print(f"Average squared error: {np.mean(all_squared_error[N])}")
-        print()
-
-if __name__ == "__main__":
-    main()
+def simulate_and_recover(v, alpha, tau, N):
+    """
+    Simulate data from true parameters and recover the parameters.
+    
+    Parameters:
+    v (float): True drift rate
+    alpha (float): True boundary separation
+    tau (float): True non-decision time
+    N (int): Sample size
+    
+    Returns:
+    tuple: (v_est, alpha_est, tau_est, bias, squared_error) - estimated parameters and error metrics
+    """
+    # True parameters as tuple
+    true_params = (v, alpha, tau)
+    
+    # Generate predicted summary statistics
+    R_pred, M_pred, V_pred = forward_ez(v, alpha, tau)
+    
+    # Simulate observed summary statistics
+    R_obs, M_obs, V_obs = simulate_observed_stats(R_pred, M_pred, V_pred, N)
+    
+    # In case of extreme values, cap R_obs away from 0 and 1
+    R_obs = max(0.001, min(0.999, R_obs))
+    
+    # Recover parameters from observed statistics
+    v_est, alpha_est, tau_est = inverse_ez(R_obs, M_obs, V_obs)
+    est_params = (v_est, alpha_est, tau_est)
+    
+    # Calculate bias and squared error
+    bias = np.array(true_params) - np.array(est_params)
+    squared_error = np.sum(bias**2)
+    
+    return v_est, alpha_est, tau_est, bias, squared_error
