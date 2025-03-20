@@ -1,3 +1,5 @@
+# Acknowledging referance to and help from some website tools for fixing codes/ errors
+
 import numpy as np
 import random
 import scipy.stats as stats

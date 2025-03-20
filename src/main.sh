@@ -8,3 +8,5 @@ mkdir -p results
 
 # Run the simulation
 python3 /workspace/EZ-diffusion-model/src/simulation_main.py
+
+# Acknowledging referance to and help from some website tools for fixing codes/ errors
