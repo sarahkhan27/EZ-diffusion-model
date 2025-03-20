@@ -1,4 +1,4 @@
-# Acknowledging reference to and help from ChatGPT
+# Acknowledging reference to and help from ChatGPT/AI tools
 
 import numpy as np
 import random

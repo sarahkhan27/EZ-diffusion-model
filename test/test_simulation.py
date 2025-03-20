@@ -1,4 +1,4 @@
-# Acknowledging reference to and help from ChatGPT
+# Acknowledging reference to and help from ChatGPT/AI tools
 
 import sys
 import os

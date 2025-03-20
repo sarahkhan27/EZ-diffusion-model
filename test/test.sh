@@ -8,5 +8,5 @@ python3 -m unittest discover -s test
 
 python3 -m unittest discover -s test -p "test_simulation.py"
 
-# Acknowledging reference to and help from ChatGPT
+# Acknowledging reference to and help from ChatGPT/AI tools
 
