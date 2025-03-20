@@ -7,4 +7,4 @@ cd "$(dirname "$0")/.."
 mkdir -p results
 
 # Run the simulation
-python3 /workspace/EZ-diffusion-model/src/simulatoin_main.py
+python3 /workspace/EZ-diffusion-model/src/simulation_main.py

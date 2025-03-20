@@ -6,7 +6,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../s
 
 import unittest
 import numpy as np
-from simulate_and_recover import forward_ez, inverse_ez
+from simulate_and_recover import forward_ez, inverse_ez, simulate_observed_stats, simulate_and_recover
 
 class TestEZDiffusion(unittest.TestCase):
     def test_forward_ez(self):
@@ -59,6 +59,7 @@ class TestEZDiffusion(unittest.TestCase):
             self.assertAlmostEqual(v_est, v_true, places=4)
             self.assertAlmostEqual(alpha_est, alpha_true, places=4)
             self.assertAlmostEqual(tau_est, tau_true, places=4)
+            
     def test_edge_cases(self):
         """Test edge cases for EZ diffusion model"""
         # Test with very high drift rate (should result in near-perfect accuracy)
@@ -87,6 +88,67 @@ class TestEZDiffusion(unittest.TestCase):
         _, M_pred_high_tau, _ = forward_ez(v, alpha, tau_high)
         _, M_pred_normal_tau, _ = forward_ez(v, alpha, 0.3)
         self.assertAlmostEqual(M_pred_high_tau - M_pred_normal_tau, 0.2, places=4)  # Difference in RT should equal difference in tau
+    
+    def test_complete_simulation_workflow(self):
+        """Test the complete simulate-and-recover process with various sample sizes"""
+        # Test parameters
+        v, alpha, tau = 1.0, 1.0, 0.3
+        
+        # Test different sample sizes
+        for N in [100, 1000]:
+            v_est, alpha_est, tau_est, bias, squared_error = simulate_and_recover(v, alpha, tau, N)
+            
+            # Check if parameters are valid (not NaN or inf)
+            self.assertFalse(np.isnan(v_est) or np.isinf(v_est))
+            self.assertFalse(np.isnan(alpha_est) or np.isinf(alpha_est))
+            self.assertFalse(np.isnan(tau_est) or np.isinf(tau_est))
+            
+            # Check if bias is calculated correctly
+            expected_bias = np.array([v, alpha, tau]) - np.array([v_est, alpha_est, tau_est])
+            np.testing.assert_array_almost_equal(bias, expected_bias)
+            
+            # Check if squared error is calculated correctly
+            expected_squared_error = np.sum((np.array([v, alpha, tau]) - np.array([v_est, alpha_est, tau_est]))**2)
+            self.assertAlmostEqual(squared_error, expected_squared_error, places=10)
+            
+            # For larger N, parameters should be recovered more accurately
+            if N == 1000:
+                self.assertLess(abs(v - v_est), 0.5)
+                self.assertLess(abs(alpha - alpha_est), 0.5)
+                self.assertLess(abs(tau - tau_est), 0.2)
+    
+    def test_numerical_stability(self):
+        """Test numerical stability with extreme parameter values"""
+        # Test cases that might cause numerical issues
+        test_cases = [
+            # Very small drift rate
+            (0.001, 1.0, 0.3),
+            # Very large drift rate
+            (10.0, 1.0, 0.3),
+            # Very small boundary
+            (1.0, 0.01, 0.3),
+            # Very large boundary
+            (1.0, 10.0, 0.3),
+            # Very small non-decision time
+            (1.0, 1.0, 0.01),
+            # Large non-decision time
+            (1.0, 1.0, 0.9)
+        ]
+        
+        for v, alpha, tau in test_cases:
+            try:
+                # Forward equations should not raise exceptions
+                R_pred, M_pred, V_pred = forward_ez(v, alpha, tau)
+                
+                # Results should be finite
+                self.assertTrue(np.isfinite(R_pred) and np.isfinite(M_pred) and np.isfinite(V_pred))
+                
+                # If values are valid, inverse should work too
+                if 0 < R_pred < 1 and M_pred > 0 and V_pred > 0:
+                    v_est, alpha_est, tau_est = inverse_ez(R_pred, M_pred, V_pred)
+                    self.assertTrue(np.isfinite(v_est) and np.isfinite(alpha_est) and np.isfinite(tau_est))
+            except Exception as e:
+                self.fail(f"Failed with parameters v={v}, alpha={alpha}, tau={tau}: {e}")
 
 if __name__ == '__main__':
     unittest.main()

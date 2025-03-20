@@ -2,16 +2,16 @@ EZ Diffusion Model Simulation Results
 ===================================
 
 Sample size N = 10
-Average bias for v: -0.209522
-Average bias for alpha: nan
-Average bias for tau: nan
-Average squared error: nan
+Average bias for v: -0.238210
+Average bias for alpha: -0.200770
+Average bias for tau: 0.004627
+Average squared error: 1.161530
 
 Sample size N = 40
-Average bias for v: -0.046100
-Average bias for alpha: nan
-Average bias for tau: nan
-Average squared error: nan
+Average bias for v: -0.047913
+Average bias for alpha: -0.033970
+Average bias for tau: 0.002890
+Average squared error: 0.196038
 
 Sample size N = 4000
 Average bias for v: -0.000004

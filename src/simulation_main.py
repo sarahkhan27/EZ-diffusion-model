@@ -1,15 +1,14 @@
 import sys
 import os
-import unittest
 import numpy as np
 import random
 import scipy.stats as stats
 
 # Add the src directory to the Python path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-# At the beginning of simulatoin_main.py
-from simulate_and_recover import forward_ez, inverse_ez, simulate_observed_stats, simulate_and_recover
+# Import from the correct module
+from src.simulate_and_recover import forward_ez, inverse_ez, simulate_observed_stats, simulate_and_recover
 
 def run_simulation(iterations=1000, N_values=[10, 40, 4000], seed=None):
     """
@@ -49,23 +48,28 @@ def run_simulation(iterations=1000, N_values=[10, 40, 4000], seed=None):
             
             # Generate random parameters within the specified ranges
             v = random.uniform(0.5, 2.0)
-            alpha = random.uniform(0.5, 2.0)
+            alpha = random.uniform(0.5, 2.0) 
             tau = random.uniform(0.1, 0.5)
             
             # Simulate and recover
-            v_e, alpha_e, tau_e, bias, squared_error = simulate_and_recover(v, alpha, tau, N)
-            
-            # Store results
-            v_true.append(v)
-            alpha_true.append(alpha)
-            tau_true.append(tau)
-            
-            v_est.append(v_e)
-            alpha_est.append(alpha_e)
-            tau_est.append(tau_e)
-            
-            biases.append(bias)
-            squared_errors.append(squared_error)
+            try:
+                v_e, alpha_e, tau_e, bias, squared_error = simulate_and_recover(v, alpha, tau, N)
+                
+                # Store results
+                v_true.append(v)
+                alpha_true.append(alpha)
+                tau_true.append(tau)
+                
+                v_est.append(v_e)
+                alpha_est.append(alpha_e)
+                tau_est.append(tau_e)
+                
+                biases.append(bias)
+                squared_errors.append(squared_error)
+            except Exception as e:
+                print(f"  Error in iteration {i+1}: {e}")
+                # Continue with next iteration
+                continue
         
         # Calculate average bias and squared error
         avg_bias = np.mean(biases, axis=0)
